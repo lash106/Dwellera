@@ -17,7 +17,7 @@ const Popup = dynamicLoad(() => import('react-leaflet').then(m => m.Popup), { ss
 export default function SearchPage() {
   const [listings, setListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<any>(null);
   const [savedProperties, setSavedProperties] = useState([]);
   const [customIcon, setCustomIcon] = useState(null);
 
