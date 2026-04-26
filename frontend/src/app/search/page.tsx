@@ -1,17 +1,18 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
-import dynamic from 'next/dynamic';
+import dynamicLoad from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 import PropertyDetailsModal from "@/components/PropertyDetailsModal";
 
-// Dynamically import Leaflet components to prevent SSR (Server Side Rendering) errors
-const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const MapContainer = dynamicLoad(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer = dynamicLoad(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
+const Marker = dynamicLoad(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
+const Popup = dynamicLoad(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
 
 export default function SearchPage() {
   const [listings, setListings] = useState([]);
