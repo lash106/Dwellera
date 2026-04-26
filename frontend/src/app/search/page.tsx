@@ -15,11 +15,11 @@ const Marker = dynamicLoad(() => import('react-leaflet').then(m => m.Marker), { 
 const Popup = dynamicLoad(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
 
 export default function SearchPage() {
-  const [listings, setListings] = useState([]);
-  const [selectedListing, setSelectedListing] = useState(null);
+  const [listings, setListings] = useState<any[]>([]);
+  const [selectedListing, setSelectedListing] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
-  const [savedProperties, setSavedProperties] = useState([]);
-  const [customIcon, setCustomIcon] = useState(null);
+  const [savedProperties, setSavedProperties] = useState<any[]>([]);
+  const [customIcon, setCustomIcon] = useState<any>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -29,7 +29,7 @@ export default function SearchPage() {
     property_type: 'All'
   });
   
-  const [mapCenter, setMapCenter] = useState([37.7749, -122.4194]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
   const [mapSearchQuery, setMapSearchQuery] = useState("");
   const [isSearchingMap, setIsSearchingMap] = useState(false);
 
@@ -52,7 +52,7 @@ export default function SearchPage() {
     fetchListings();
   }, []);
 
-  const fetchSavedProperties = async (userId) => {
+  const fetchSavedProperties = async (userId: string) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inbox?user_id=${userId}`);
       const data = await res.json();
@@ -77,7 +77,7 @@ export default function SearchPage() {
     }
   };
 
-  const handleMapSearch = async (e) => {
+  const handleMapSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mapSearchQuery.trim()) return;
     setIsSearchingMap(true);
@@ -96,7 +96,7 @@ export default function SearchPage() {
     }
   };
 
-  const handleOpenChat = (prop) => {
+  const handleOpenChat = (prop: any) => {
     if (typeof window !== 'undefined') {
       window.location.href = `/messages?listing_id=${prop.listing_id}&receiver_id=${prop.other_user_id}`;
     }
@@ -126,7 +126,7 @@ export default function SearchPage() {
               <div className="mb-4 bg-gray-50 border rounded-lg p-3 shadow-sm">
                 <h3 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wide">Saved / Messaged</h3>
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {savedProperties.map(prop => (
+                  {savedProperties.map((prop: any) => (
                     <div key={prop.listing_id} onClick={() => handleOpenChat(prop)} className="shrink-0 w-36 bg-white p-2.5 rounded border shadow-sm cursor-pointer">
                       <p className="text-xs font-bold line-clamp-1">{prop.listing_title}</p>
                       <p className="text-[10px] text-blue-600 mt-1 font-semibold">Open Chat</p>
@@ -140,9 +140,9 @@ export default function SearchPage() {
           </div>
           <div className="overflow-y-auto p-4 flex-1">
             <div className="space-y-4">
-              {listings.map((l, i) => (
+              {listings.map((l: any, i: number) => (
                 <div key={i} onClick={() => setSelectedListing(l)} className="p-4 border rounded-xl shadow-sm bg-white cursor-pointer">
-                  <img src={l.image_urls?.[0]} className="w-full h-48 object-cover rounded-lg mb-3" />
+                  <img src={l.image_urls?.[0]} className="w-full h-48 object-cover rounded-lg mb-3" alt={l.title} />
                   <h3 className="font-semibold text-lg text-gray-800">{l.title}</h3>
                   <p className="text-blue-600 font-extrabold text-xl">${l.price?.toLocaleString()}</p>
                 </div>
@@ -160,7 +160,7 @@ export default function SearchPage() {
           </div>
           <MapContainer key={`${mapCenter[0]}-${mapCenter[1]}`} center={mapCenter} zoom={12} style={{ height: '100%', width: '100%' }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-            {customIcon && listings.map((l, i) => (
+            {customIcon && listings.map((l: any, i: number) => (
               <Marker key={i} position={[l.location_lat, l.location_lng]} icon={customIcon}>
                 <Popup>
                   <div className="p-1 w-[200px]">
