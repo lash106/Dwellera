@@ -1,16 +1,17 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import dynamic from 'next/dynamic';
+import dynamicLoad from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 import PropertyDetailsModal from "@/components/PropertyDetailsModal";
 
-// Dynamically import Leaflet components to prevent SSR (Server Side Rendering) errors
-const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const MapContainer = dynamicLoad(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer = dynamicLoad(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
+const Marker = dynamicLoad(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
+const Popup = dynamicLoad(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
 
 export default function SearchPage() {
   const [listings, setListings] = useState([]);
@@ -32,7 +33,6 @@ export default function SearchPage() {
   const [isSearchingMap, setIsSearchingMap] = useState(false);
 
   useEffect(() => {
-    // 1. Initialize Leaflet ONLY in the browser to fix "window is not defined"
     const L = require('leaflet');
     const leafIcon = L.icon({
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -43,13 +43,11 @@ export default function SearchPage() {
     });
     setCustomIcon(leafIcon);
 
-    // 2. Auth Session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchSavedProperties(session.user.id);
     });
 
-    // 3. Initial Listings fetch
     fetchListings();
   }, []);
 
@@ -102,7 +100,6 @@ export default function SearchPage() {
   return (
     <div className="flex flex-col md:flex-row w-full h-screen overflow-hidden">
       
-      {/* LEFT SIDEBAR: Filters */}
       <div className="w-full md:w-72 bg-white border-r flex flex-col overflow-y-auto p-5 shadow-sm">
         <h2 className="text-xl font-bold mb-6">Filters</h2>
         <div className="space-y-4">
@@ -112,8 +109,8 @@ export default function SearchPage() {
             value={filters.search} onChange={e => setFilters({...filters, search: e.target.value})}
           />
           <div className="flex gap-2">
-              <input type="number" placeholder="Min $" className="w-1/2 px-3 py-2 border rounded-md" value={filters.min_price} onChange={e => setFilters({...filters, min_price: e.target.value})} />
-              <input type="number" placeholder="Max $" className="w-1/2 px-3 py-2 border rounded-md" value={filters.max_price} onChange={e => setFilters({...filters, max_price: e.target.value})} />
+            <input type="number" placeholder="Min $" className="w-1/2 px-3 py-2 border rounded-md" value={filters.min_price} onChange={e => setFilters({...filters, min_price: e.target.value})} />
+            <input type="number" placeholder="Max $" className="w-1/2 px-3 py-2 border rounded-md" value={filters.max_price} onChange={e => setFilters({...filters, max_price: e.target.value})} />
           </div>
           <button 
             onClick={fetchListings}
@@ -124,7 +121,6 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* MIDDLE: List Results */}
       <div className="w-full md:w-96 bg-gray-50 flex flex-col border-r relative overflow-y-auto">
         <div className="p-4 border-b bg-white sticky top-0 z-10">
           <h1 className="text-xl font-bold">Marketplace</h1>
@@ -146,18 +142,17 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* RIGHT: Map */}
       <div className="flex-1 relative">
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-xs px-4">
-           <form onSubmit={handleMapSearch} className="flex shadow-xl rounded-xl bg-white p-1 border">
-             <input 
-               value={mapSearchQuery} 
-               onChange={e => setMapSearchQuery(e.target.value)} 
-               placeholder="Search city..."
-               className="flex-1 px-4 py-2 focus:outline-none text-sm"
-             />
-             <button type="submit" className="px-4 py-2 bg-black text-white rounded-lg text-sm">Go</button>
-           </form>
+          <form onSubmit={handleMapSearch} className="flex shadow-xl rounded-xl bg-white p-1 border">
+            <input 
+              value={mapSearchQuery} 
+              onChange={e => setMapSearchQuery(e.target.value)} 
+              placeholder="Search city..."
+              className="flex-1 px-4 py-2 focus:outline-none text-sm"
+            />
+            <button type="submit" className="px-4 py-2 bg-black text-white rounded-lg text-sm">Go</button>
+          </form>
         </div>
 
         <MapContainer 
@@ -168,22 +163,3 @@ export default function SearchPage() {
         >
           <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
           {customIcon && listings.map((l, i) => (
-            <Marker key={i} position={[l.location_lat, l.location_lng]} icon={customIcon}>
-              <Popup>
-                <div className="p-1">
-                  <h3 className="font-bold text-sm">{l.title}</h3>
-                  <p className="text-blue-600">${l.price?.toLocaleString()}</p>
-                  <button onClick={() => setSelectedListing(l)} className="mt-2 w-full text-xs py-1 bg-gray-200 rounded">Details</button>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-      </div>
-
-      {selectedListing && (
-        <PropertyDetailsModal listing={selectedListing} onClose={() => setSelectedListing(null)} />
-      )}
-    </div>
-  );
-}
