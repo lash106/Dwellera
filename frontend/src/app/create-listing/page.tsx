@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +11,7 @@ const LocationPickerMap = dynamic(() => import('@/components/LocationPickerMap')
 export default function CreateListingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({
     title: "",
@@ -22,6 +23,23 @@ export default function CreateListingPage() {
     location_lat: 37.7749,
     location_lng: -122.4194,
   });
+
+  useEffect(() => {
+    const checkVerification = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${session.user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setVerificationStatus(data.verification_status || "pending");
+        }
+      } catch (err) {
+        console.error("Failed to check seller verification", err);
+      }
+    };
+    checkVerification();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -61,6 +79,17 @@ export default function CreateListingPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not logged in!");
+
+      const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${session.user.id}`);
+      if (userRes.ok) {
+        const appUser = await userRes.json();
+        if (appUser.verification_status !== "verified") {
+          alert(`Seller verification required before listing. Current status: ${appUser.verification_status}`);
+          setVerificationStatus(appUser.verification_status);
+          setLoading(false);
+          return;
+        }
+      }
 
       // 1. Upload Images to Cloudinary sequentially
       const uploadedUrls = [];
@@ -106,8 +135,14 @@ export default function CreateListingPage() {
     <ProtectedRoute>
       <div className="max-w-3xl mx-auto p-8">
         <h1 className="text-3xl font-bold mb-6">Create New Listing</h1>
+        {verificationStatus && verificationStatus !== "verified" && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-900">
+            <h2 className="font-bold">Listing access locked</h2>
+            <p className="text-sm mt-1">Your seller verification is currently {verificationStatus.replaceAll('_', ' ')}. An agent must approve your ID before you can publish properties.</p>
+          </div>
+        )}
         
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-sm border">
+        <form onSubmit={handleSubmit} className={`space-y-6 bg-white p-8 rounded-xl shadow-sm border ${verificationStatus && verificationStatus !== "verified" ? "opacity-60 pointer-events-none" : ""}`}>
           <div className="grid grid-cols-1 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Property Title</label>

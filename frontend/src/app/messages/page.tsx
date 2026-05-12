@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 
-export default function MessagesPage() {
+function MessagesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const listingId = searchParams.get("listing_id");
@@ -301,5 +301,13 @@ export default function MessagesPage() {
 
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-gray-500">Loading messages...</div>}>
+      <MessagesPageContent />
+    </Suspense>
   );
 }

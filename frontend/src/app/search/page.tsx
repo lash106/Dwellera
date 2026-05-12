@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 import dynamic from 'next/dynamic';
+import type { DivIcon } from 'leaflet';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
@@ -12,7 +13,6 @@ const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: f
 const HeatmapLayer = dynamic(() => import('@/components/HeatmapLayer'), { ssr: false });
 const DrawLayer = dynamic(() => import('@/components/DrawLayer'), { ssr: false });
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import PropertyDetailsModal from "@/components/PropertyDetailsModal";
 
 function formatPrice(price: number): string {
@@ -21,9 +21,10 @@ function formatPrice(price: number): string {
   return `$${price}`;
 }
 
-function createPriceIcon(price: number): L.DivIcon {
+function createPriceIcon(price: number): DivIcon {
+  const leaflet = require('leaflet') as typeof import('leaflet');
   const label = formatPrice(price);
-  return L.divIcon({
+  return leaflet.divIcon({
     className: "",
     html: `
       <div style="
@@ -88,6 +89,9 @@ export default function SearchPage() {
     min_bedrooms: '',
     property_type: 'All'
   });
+  const [naturalQuery, setNaturalQuery] = useState("");
+  const [naturalSearchSummary, setNaturalSearchSummary] = useState("");
+  const [naturalSearchLoading, setNaturalSearchLoading] = useState(false);
   
   const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
   const [mapSearchQuery, setMapSearchQuery] = useState("");
@@ -171,6 +175,34 @@ export default function SearchPage() {
     fetchListings();
   }, []);
 
+  const runNaturalSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = naturalQuery.trim();
+    if (!query) return;
+
+    setNaturalSearchLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings/nlp-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, limit: 50 })
+      });
+      const result = await res.json();
+      const data = Array.isArray(result.listings) ? result.listings : [];
+      setListings(data);
+      setTotalListings(data.length);
+      setNaturalSearchSummary(result.message || "");
+      if (data[0]?.location_lat && data[0]?.location_lng) {
+        setMapCenter([data[0].location_lat, data[0].location_lng]);
+      }
+    } catch (err) {
+      console.error("Natural language search failed:", err);
+      setNaturalSearchSummary("Natural search failed. Make sure the backend is running.");
+    } finally {
+      setNaturalSearchLoading(false);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="flex flex-col md:flex-row w-full min-h-full md:h-full">
@@ -180,6 +212,27 @@ export default function SearchPage() {
           <h2 className="text-xl font-bold mb-6 mt-4">Filters</h2>
           
           <div className="space-y-6">
+            <form onSubmit={runNaturalSearch} className="bg-gray-50 border rounded-lg p-3">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Natural Search</label>
+              <textarea
+                value={naturalQuery}
+                onChange={e => setNaturalQuery(e.target.value)}
+                rows={3}
+                placeholder="e.g. best value condos in SOMA under $1.3M"
+                className="w-full px-3 py-2 border rounded-md text-sm resize-none"
+              />
+              <button
+                type="submit"
+                disabled={!naturalQuery.trim() || naturalSearchLoading}
+                className="w-full mt-2 py-2 bg-gray-900 text-white font-medium rounded-md hover:bg-black transition disabled:opacity-50"
+              >
+                {naturalSearchLoading ? "Searching..." : "Ask Dwellera"}
+              </button>
+              {naturalSearchSummary && (
+                <p className="mt-2 text-xs text-gray-500 leading-relaxed">{naturalSearchSummary}</p>
+              )}
+            </form>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Search Term</label>
               <input 

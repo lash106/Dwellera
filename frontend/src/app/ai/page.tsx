@@ -20,6 +20,9 @@ export default function AIPage() {
   const [logs, setLogs] = useState<{ role: string; text: string; properties?: any[] }[]>([]);
   const [foundProperties, setFoundProperties] = useState<any[]>([]);
   const [selectedListing, setSelectedListing] = useState<any>(null);
+  const [textQuery, setTextQuery] = useState("");
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [lastSearchSummary, setLastSearchSummary] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -35,6 +38,51 @@ export default function AIPage() {
 
   const addLog = (role: string, text: string, properties?: any[]) => {
     setLogs((prev) => [...prev, { role, text, properties }]);
+  };
+
+  const runNlpSearch = async (queryText: string, announceUser = false) => {
+    const cleaned = queryText.trim();
+    if (!cleaned) return null;
+
+    if (announceUser) addLog("user", cleaned);
+    setNlpLoading(true);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings/nlp-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: cleaned, limit: 10 })
+      });
+
+      if (!res.ok) throw new Error("NLP search failed");
+      const result = await res.json();
+      const properties = Array.isArray(result.listings) ? result.listings : [];
+
+      setFoundProperties(properties.slice(0, 10));
+      setLastSearchSummary(result.message || "");
+      addLog("system", result.message || `Found ${properties.length} matching properties.`, properties.slice(0, 5));
+      return result;
+    } catch (err) {
+      console.error("NLP search failed", err);
+      addLog("system", "I could not complete that property search. Make sure the backend is running.");
+      return null;
+    } finally {
+      setNlpLoading(false);
+    }
+  };
+
+  const buildToolQuery = (args: any) => {
+    if (args?.raw_query) return String(args.raw_query);
+    const parts: string[] = [];
+    if (args?.search) parts.push(String(args.search));
+    if (args?.area) parts.push(`in ${args.area}`);
+    if (args?.property_type) parts.push(String(args.property_type));
+    if (args?.min_price) parts.push(`over ${args.min_price}`);
+    if (args?.max_price) parts.push(`under ${args.max_price}`);
+    if (args?.min_bedrooms) parts.push(`${args.min_bedrooms}+ bedrooms`);
+    if (args?.min_bathrooms) parts.push(`${args.min_bathrooms}+ bathrooms`);
+    if (Array.isArray(args?.features)) parts.push(`with ${args.features.join(" and ")}`);
+    return parts.join(" ").trim() || "available properties";
   };
 
   const connectAPI = async () => {
@@ -58,7 +106,7 @@ export default function AIPage() {
       console.error("Failed to list internal models:", err);
     }
 
-    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -70,6 +118,7 @@ export default function AIPage() {
       const setupMsg = {
         setup: {
           model: "models/gemini-2.5-flash-native-audio-preview-12-2025",
+          systemInstruction: "You are Dwellera's real estate search assistant. When a user asks for homes, call search_marketplace. Always include raw_query with the user's full natural-language request when possible, because the backend understands area, budget, beds, baths, property type, status, amenities, and ranking terms.",
           generationConfig: {
             responseModalities: ["AUDIO"],
             speechConfig: {
@@ -85,15 +134,19 @@ export default function AIPage() {
               functionDeclarations: [
                 {
                   name: "search_marketplace",
-                  description: "Searches the real estate database for properties matching user criteria. Call this whenever the user asks to find, look for, or see properties.",
+                  description: "Searches the real estate database with a natural-language parser. Call this whenever the user asks to find, look for, compare, rank, or see properties.",
                   parameters: {
                     type: "OBJECT",
                     properties: {
+                      raw_query: { type: "STRING", description: "The user's complete natural-language search request, e.g. 'show me 3 bed houses in San Jose under 2 million with modern finishes'." },
+                      area: { type: "STRING", description: "City, neighborhood, or area, e.g. San Francisco, SOMA, Mission, San Jose, Willow Glen." },
                       search: { type: "STRING", description: "General search term, e.g. 'Pool', 'Modern'" },
                       property_type: { type: "STRING", description: "Type of property: 'House', 'Apartment', 'Condo', or 'Townhouse'." },
                       min_price: { type: "NUMBER" },
                       max_price: { type: "NUMBER" },
-                      min_bedrooms: { type: "NUMBER" }
+                      min_bedrooms: { type: "NUMBER" },
+                      min_bathrooms: { type: "NUMBER" },
+                      features: { type: "ARRAY", items: { type: "STRING" }, description: "Amenity or description terms like pool, views, historic, modern, loft, park." }
                     }
                   }
                 },
@@ -164,15 +217,9 @@ export default function AIPage() {
 
           if (call.name === "search_marketplace") {
             try {
-              const query = new URLSearchParams();
-              if (call.args.search) query.append('search', call.args.search);
-              if (call.args.property_type) query.append('property_type', call.args.property_type);
-              if (call.args.min_price) query.append('min_price', call.args.min_price.toString());
-              if (call.args.max_price) query.append('max_price', call.args.max_price.toString());
-              if (call.args.min_bedrooms) query.append('min_bedrooms', call.args.min_bedrooms.toString());
-
-              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings?${query.toString()}`);
-              const dbData = await res.json();
+              const searchText = buildToolQuery(call.args || {});
+              const result = await runNlpSearch(searchText);
+              const dbData = result?.listings || [];
               
               // Extract data for both AI and Map
               const mapData = dbData.slice(0, 10); // Show up to 10 on map
@@ -191,7 +238,7 @@ export default function AIPage() {
 
               responses.push({
                 id: call.id,
-                response: { result: slimData.length > 0 ? slimData : "No properties found matching those tools." }
+                response: { result: slimData.length > 0 ? { summary: result?.message, properties: slimData } : (result?.message || "No properties found matching those criteria.") }
               });
               
               if (slimData.length > 0) {
@@ -354,6 +401,14 @@ export default function AIPage() {
     nextPlayTimeRef.current += buffer.duration;
   };
 
+  const handleTextSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = textQuery.trim();
+    if (!query || nlpLoading) return;
+    setTextQuery("");
+    await runNlpSearch(query, true);
+  };
+
   // cleanup
   useEffect(() => {
     return () => {
@@ -481,27 +536,51 @@ export default function AIPage() {
               </div>
 
               {/* Voice Controls */}
-              <div className="p-6 bg-white border-t flex justify-center items-center shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] relative z-10">
-                {connected ? (
+              <div className="p-4 md:p-6 bg-white border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] relative z-10">
+                <form onSubmit={handleTextSearch} className="flex gap-2 mb-4">
+                  <input
+                    value={textQuery}
+                    onChange={e => setTextQuery(e.target.value)}
+                    placeholder="Try: 3 bed houses in San Jose under $2M with modern finishes"
+                    className="flex-1 px-4 py-3 border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    aria-label="Natural language property search"
+                  />
                   <button
-                    onClick={micActive ? stopMic : startMic}
-                    className={`
-                      w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl
-                      ${micActive ? 'bg-red-500 scale-110 shadow-red-500/40' : 'bg-primary hover:scale-105 shadow-primary/40'}
-                   `}
+                    type="submit"
+                    disabled={!textQuery.trim() || nlpLoading}
+                    className="px-5 py-3 bg-primary text-white font-bold rounded-2xl hover:bg-black transition disabled:opacity-50"
                   >
-                    {micActive ? (
-                      <div className="w-5 h-5 bg-white rounded-sm animate-pulse"></div>
-                    ) : (
-                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                    )}
+                    {nlpLoading ? "Searching" : "Search"}
                   </button>
-                ) : (
-                  <div className="flex items-center gap-2 text-gray-400 font-bold bg-gray-50 px-6 py-3 rounded-full border border-dashed border-gray-200">
-                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                    Initialize Interface to start
-                  </div>
+                </form>
+
+                {lastSearchSummary && (
+                  <p className="text-xs text-gray-500 mb-4 text-center">{lastSearchSummary}</p>
                 )}
+
+                <div className="flex justify-center items-center">
+                  {connected ? (
+                    <button
+                      onClick={micActive ? stopMic : startMic}
+                      className={`
+                        w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl
+                        ${micActive ? 'bg-red-500 scale-110 shadow-red-500/40' : 'bg-primary hover:scale-105 shadow-primary/40'}
+                     `}
+                      aria-label={micActive ? "Stop microphone" : "Start microphone"}
+                    >
+                      {micActive ? (
+                        <div className="w-5 h-5 bg-white rounded-sm animate-pulse"></div>
+                      ) : (
+                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 text-gray-400 font-bold bg-gray-50 px-6 py-3 rounded-full border border-dashed border-gray-200">
+                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                      Initialize Interface for voice
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

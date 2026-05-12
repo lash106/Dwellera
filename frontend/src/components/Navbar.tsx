@@ -82,6 +82,8 @@ export default function Navbar() {
                 <div className="hidden md:flex items-center gap-6 text-sm font-medium">
                     {!session && <Link href="/" className="hover:text-gray-300 transition">Home</Link>}
                     {session && <Link href="/search" className="hover:text-gray-300 transition">Map</Link>}
+                    {session && <Link href="/negotiation" className="hover:text-gray-300 transition">Negotiation</Link>}
+                    {session && <Link href="/verification-agent" className="hover:text-gray-300 transition">Verify Sellers</Link>}
                     {session && <Link href="/messages" className="hover:text-gray-300 transition">Messages</Link>}
                     {session && <Link href="/settings" className="hover:text-gray-300 transition">Settings</Link>}
 
@@ -107,6 +109,8 @@ export default function Navbar() {
                 <div className="md:hidden absolute top-full left-0 right-0 bg-primary border-t border-white/10 flex flex-col py-6 px-6 gap-5 shadow-2xl z-[60]">
                     {!session && <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Home</Link>}
                     {session && <Link href="/search" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Map</Link>}
+                    {session && <Link href="/negotiation" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Negotiation</Link>}
+                    {session && <Link href="/verification-agent" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Verify Sellers</Link>}
                     {session && <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Messages</Link>}
                     {session && <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-medium text-white hover:text-gray-200">Settings</Link>}
 
