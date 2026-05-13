@@ -1,25 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 import dynamic from 'next/dynamic';
+import type { DivIcon } from 'leaflet';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const HeatmapLayer = dynamic(() => import('@/components/HeatmapLayer'), { ssr: false });
+const DrawLayer = dynamic(() => import('@/components/DrawLayer'), { ssr: false });
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import PropertyDetailsModal from "@/components/PropertyDetailsModal";
 
-const icon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
+function formatPrice(price: number): string {
+  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(1)}M`;
+  if (price >= 1_000) return `$${Math.round(price / 1_000)}K`;
+  return `$${price}`;
+}
+
+function createPriceIcon(price: number): DivIcon {
+  const leaflet = require('leaflet') as typeof import('leaflet');
+  const label = formatPrice(price);
+  return leaflet.divIcon({
+    className: "",
+    html: `
+      <div style="
+        background: white;
+        color: #111;
+        font-size: 12px;
+        font-weight: 800;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        padding: 5px 10px;
+        border-radius: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+        white-space: nowrap;
+        position: relative;
+        display: inline-block;
+        border: 1.5px solid rgba(0,0,0,0.08);
+        letter-spacing: -0.2px;
+      ">
+        ${label}
+        <div style="
+          position: absolute;
+          bottom: -6px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0; height: 0;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-top: 6px solid white;
+        "></div>
+      </div>`,
+    iconAnchor: [28, 36],
+    popupAnchor: [0, -38],
+  });
+}
 
 
 
@@ -51,10 +89,49 @@ export default function SearchPage() {
     min_bedrooms: '',
     property_type: 'All'
   });
+  const [naturalQuery, setNaturalQuery] = useState("");
+  const [naturalSearchSummary, setNaturalSearchSummary] = useState("");
+  const [naturalSearchLoading, setNaturalSearchLoading] = useState(false);
   
   const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
   const [mapSearchQuery, setMapSearchQuery] = useState("");
   const [isSearchingMap, setIsSearchingMap] = useState(false);
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawnPolygon, setDrawnPolygon] = useState<[number, number][] | null>(null);
+  const [totalListings, setTotalListings] = useState(0);
+
+  const fetchListingsInPolygon = async (pts: [number, number][]) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          polygon: pts,
+          search: filters.search || null,
+          min_price: filters.min_price ? Number(filters.min_price) : null,
+          max_price: filters.max_price ? Number(filters.max_price) : null,
+          min_bedrooms: filters.min_bedrooms ? Number(filters.min_bedrooms) : null,
+          property_type: filters.property_type !== 'All' ? filters.property_type : null,
+        }),
+      });
+      const data = await res.json();
+      setListings(data);
+    } catch (err) {
+      console.error('Failed to fetch listings in polygon:', err);
+    }
+  };
+
+  const handleDrawComplete = useCallback((pts: [number, number][]) => {
+    setDrawnPolygon(pts);
+    setDrawMode(false);
+    fetchListingsInPolygon(pts);
+  }, [filters]);
+
+  const clearDraw = () => {
+    setDrawnPolygon(null);
+    setDrawMode(false);
+    fetchListings();
+  };
 
   const handleMapSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +165,7 @@ export default function SearchPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings?${params.toString()}`);
       const data = await res.json();
       setListings(data);
+      setTotalListings(data.length);
     } catch (err) {
       console.error('Failed to fetch listings:', err);
     }
@@ -96,6 +174,34 @@ export default function SearchPage() {
   useEffect(() => {
     fetchListings();
   }, []);
+
+  const runNaturalSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = naturalQuery.trim();
+    if (!query) return;
+
+    setNaturalSearchLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings/nlp-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, limit: 50 })
+      });
+      const result = await res.json();
+      const data = Array.isArray(result.listings) ? result.listings : [];
+      setListings(data);
+      setTotalListings(data.length);
+      setNaturalSearchSummary(result.message || "");
+      if (data[0]?.location_lat && data[0]?.location_lng) {
+        setMapCenter([data[0].location_lat, data[0].location_lng]);
+      }
+    } catch (err) {
+      console.error("Natural language search failed:", err);
+      setNaturalSearchSummary("Natural search failed. Make sure the backend is running.");
+    } finally {
+      setNaturalSearchLoading(false);
+    }
+  };
 
   return (
     <ProtectedRoute>
@@ -106,6 +212,27 @@ export default function SearchPage() {
           <h2 className="text-xl font-bold mb-6 mt-4">Filters</h2>
           
           <div className="space-y-6">
+            <form onSubmit={runNaturalSearch} className="bg-gray-50 border rounded-lg p-3">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Natural Search</label>
+              <textarea
+                value={naturalQuery}
+                onChange={e => setNaturalQuery(e.target.value)}
+                rows={3}
+                placeholder="e.g. best value condos in SOMA under $1.3M"
+                className="w-full px-3 py-2 border rounded-md text-sm resize-none"
+              />
+              <button
+                type="submit"
+                disabled={!naturalQuery.trim() || naturalSearchLoading}
+                className="w-full mt-2 py-2 bg-gray-900 text-white font-medium rounded-md hover:bg-black transition disabled:opacity-50"
+              >
+                {naturalSearchLoading ? "Searching..." : "Ask Dwellera"}
+              </button>
+              {naturalSearchSummary && (
+                <p className="mt-2 text-xs text-gray-500 leading-relaxed">{naturalSearchSummary}</p>
+              )}
+            </form>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Search Term</label>
               <input 
@@ -181,14 +308,17 @@ export default function SearchPage() {
               </div>
             )}
             <h1 className="text-xl font-bold text-gray-900">Marketplace</h1>
-            <p className="text-sm text-gray-500">{listings.length} properties found</p>
+            <p className="text-sm text-gray-500">
+              {listings.length} {drawnPolygon ? `of ${totalListings} ` : ''}properties found
+              {drawnPolygon && <span className="ml-2 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Area filtered</span>}
+            </p>
           </div>
           
           <div className="overflow-y-auto p-4 flex-1">
             <div className="space-y-4">
               {listings.map((l: any, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   onClick={() => setSelectedListing(l)}
                   className={`p-4 border rounded-xl shadow-sm hover:shadow-md transition cursor-pointer ${l.status === 'Sold' ? 'bg-gray-50 opacity-75' : 'bg-white'}`}
                   tabIndex={0}
@@ -228,24 +358,60 @@ export default function SearchPage() {
         {/* RIGHT: Full Height Map */}
         <div className="w-full h-[50vh] md:w-auto md:flex-1 md:h-full relative z-[5] order-first md:order-last border-b md:border-none shadow-sm md:shadow-none">
           
+          {/* Lasso Controls */}
+          <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
+            {!drawnPolygon ? (
+              <button
+                onClick={() => setDrawMode(m => !m)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-lg border transition-all ${
+                  drawMode
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white/90 backdrop-blur-sm text-gray-700 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-7 7M9 9l6 6m0-6L9 15m6-6l-7 7" />
+                </svg>
+                {drawMode ? 'Drawing…' : 'Lasso Select'}
+              </button>
+            ) : (
+              <button
+                onClick={clearDraw}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-lg border bg-white/90 backdrop-blur-sm text-red-600 border-red-200 hover:border-red-400 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear Selection
+              </button>
+            )}
+            {drawMode && (
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white text-xs font-medium px-3 py-2 rounded-xl shadow-lg text-center leading-snug">
+                Hold & drag to draw a selection
+              </div>
+            )}
+          </div>
+
           {/* Address Search Overlay */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-sm px-4">
              <form onSubmit={handleMapSearch} className="flex shadow-xl rounded-xl bg-white/90 backdrop-blur-sm p-1.5 border border-gray-200">
-               <input 
-                 value={mapSearchQuery} 
-                 onChange={e => setMapSearchQuery(e.target.value)} 
+               <input
+                 value={mapSearchQuery}
+                 onChange={e => setMapSearchQuery(e.target.value)}
                  placeholder="Fly map to city, zip, or address..."
                  className="flex-1 px-4 py-2 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500 font-medium"
                />
-               <button 
-                 type="submit" 
-                 disabled={isSearchingMap} 
+               <button
+                 type="submit"
+                 disabled={isSearchingMap}
                  className="px-5 py-2 bg-gray-900 text-white font-bold rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
                >
                   {isSearchingMap ? '...' : 'Go'}
                </button>
              </form>
           </div>
+
+
 
           <MapContainer 
             key={`${mapCenter[0]}-${mapCenter[1]}`}
@@ -258,8 +424,10 @@ export default function SearchPage() {
               attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             />
+            <HeatmapLayer listings={listings} visible={true} />
+            <DrawLayer active={drawMode} polygon={drawnPolygon} onComplete={handleDrawComplete} />
             {listings.map((l: any, i) => (
-              <Marker key={i} position={[l.location_lat, l.location_lng]} icon={icon}>
+              <Marker key={i} position={[l.location_lat, l.location_lng]} icon={createPriceIcon(l.price)}>
                 <Popup>
                   <div className="p-1 w-[200px]">
                     {l.image_urls && l.image_urls.length > 0 && (

@@ -1,0 +1,96 @@
+<svg width="800" viewBox="0 0 800 660" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="660" fill="#0f1e30"/>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-size="16" font-weight="600" fill="#dff0f8">Dwellera — System Architecture</text>
+
+  <!-- USER -->
+  <rect x="310" y="50" width="180" height="48" rx="8" fill="#1e3a56" stroke="#38bdf8" stroke-width="1"/>
+  <text x="400" y="79" text-anchor="middle" font-size="14" font-weight="500" fill="#dff0f8">User / Browser</text>
+
+  <!-- Arrow: user -> frontend -->
+  <line x1="400" y1="98" x2="400" y2="138" stroke="#6a97b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="420" y="122" font-size="11" fill="#6a97b8">HTTPS</text>
+
+  <!-- FRONTEND CONTAINER -->
+  <rect x="40" y="138" width="720" height="148" rx="12" fill="#1a2a45" stroke="#7c6af7" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="55" y="160" font-size="11" fill="#9f8ffa">Frontend — Next.js 18 · TypeScript · Tailwind CSS</text>
+
+  <!-- Frontend boxes -->
+  <rect x="62" y="168" width="192" height="96" rx="8" fill="#1e2e52" stroke="#7c6af7" stroke-width="1"/>
+  <text x="158" y="202" text-anchor="middle" font-size="14" font-weight="500" fill="#c5bbff">Map Search</text>
+  <text x="158" y="222" text-anchor="middle" font-size="12" fill="#8878cc">Leaflet + geocoding</text>
+  <text x="158" y="240" text-anchor="middle" font-size="12" fill="#8878cc">CartoDB base maps</text>
+
+  <rect x="304" y="168" width="192" height="96" rx="8" fill="#1e2e52" stroke="#7c6af7" stroke-width="1"/>
+  <text x="400" y="202" text-anchor="middle" font-size="14" font-weight="500" fill="#c5bbff">Real-time Chat</text>
+  <text x="400" y="222" text-anchor="middle" font-size="12" fill="#8878cc">Supabase broadcast</text>
+  <text x="400" y="240" text-anchor="middle" font-size="12" fill="#8878cc">WebSocket sync</text>
+
+  <rect x="546" y="168" width="192" height="96" rx="8" fill="#1e2e52" stroke="#7c6af7" stroke-width="1"/>
+  <text x="642" y="202" text-anchor="middle" font-size="14" font-weight="500" fill="#c5bbff">Seller Dashboard</text>
+  <text x="642" y="222" text-anchor="middle" font-size="12" fill="#8878cc">List, manage, toggle</text>
+  <text x="642" y="240" text-anchor="middle" font-size="12" fill="#8878cc">Property listings</text>
+
+  <!-- Arrow: frontend -> backend -->
+  <line x1="400" y1="286" x2="400" y2="326" stroke="#6a97b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="420" y="310" font-size="11" fill="#6a97b8">REST API</text>
+
+  <!-- BACKEND CONTAINER -->
+  <rect x="40" y="326" width="720" height="148" rx="12" fill="#0d2820" stroke="#34d399" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="55" y="348" font-size="11" fill="#5ec49a">Backend — FastAPI · Python · SQLAlchemy · Uvicorn</text>
+
+  <!-- Backend boxes -->
+  <rect x="62" y="358" width="192" height="96" rx="8" fill="#0f2e20" stroke="#34d399" stroke-width="1"/>
+  <text x="158" y="392" text-anchor="middle" font-size="14" font-weight="500" fill="#86efcc">Listings API</text>
+  <text x="158" y="412" text-anchor="middle" font-size="12" fill="#4da87c">CRUD, availability</text>
+  <text x="158" y="430" text-anchor="middle" font-size="12" fill="#4da87c">Status toggling</text>
+
+  <rect x="304" y="358" width="192" height="96" rx="8" fill="#0f2e20" stroke="#34d399" stroke-width="1"/>
+  <text x="400" y="392" text-anchor="middle" font-size="14" font-weight="500" fill="#86efcc">Auth &amp; Users</text>
+  <text x="400" y="412" text-anchor="middle" font-size="12" fill="#4da87c">Sessions, accounts</text>
+  <text x="400" y="430" text-anchor="middle" font-size="12" fill="#4da87c">Login, register</text>
+
+  <rect x="546" y="358" width="192" height="96" rx="8" fill="#0f2e20" stroke="#34d399" stroke-width="1"/>
+  <text x="642" y="392" text-anchor="middle" font-size="14" font-weight="500" fill="#86efcc">Image Upload</text>
+  <text x="642" y="412" text-anchor="middle" font-size="12" fill="#4da87c">Cloudinary API</text>
+  <text x="642" y="430" text-anchor="middle" font-size="12" fill="#4da87c">Drag-and-drop</text>
+
+  <!-- Arrows: backend -> external services -->
+  <line x1="158" y1="474" x2="158" y2="524" stroke="#6a97b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="400" y1="474" x2="400" y2="524" stroke="#6a97b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="642" y1="474" x2="642" y2="524" stroke="#6a97b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- EXTERNAL SERVICES -->
+  <rect x="42" y="524" width="220" height="96" rx="8" fill="#1f1520" stroke="#fb7185" stroke-width="1"/>
+  <text x="152" y="556" text-anchor="middle" font-size="14" font-weight="500" fill="#fca5a5">Supabase</text>
+  <text x="152" y="576" text-anchor="middle" font-size="12" fill="#c07080">PostgreSQL database</text>
+  <text x="152" y="594" text-anchor="middle" font-size="12" fill="#c07080">Row level security</text>
+
+  <rect x="290" y="524" width="220" height="96" rx="8" fill="#1f1520" stroke="#fb7185" stroke-width="1"/>
+  <text x="400" y="556" text-anchor="middle" font-size="14" font-weight="500" fill="#fca5a5">Supabase Realtime</text>
+  <text x="400" y="576" text-anchor="middle" font-size="12" fill="#c07080">Broadcast channels</text>
+  <text x="400" y="594" text-anchor="middle" font-size="12" fill="#c07080">WebSocket events</text>
+
+  <rect x="538" y="524" width="220" height="96" rx="8" fill="#1a1a10" stroke="#fbbf24" stroke-width="1"/>
+  <text x="648" y="556" text-anchor="middle" font-size="14" font-weight="500" fill="#fde68a">Cloudinary</text>
+  <text x="648" y="576" text-anchor="middle" font-size="12" fill="#c09a40">Image CDN</text>
+  <text x="648" y="594" text-anchor="middle" font-size="12" fill="#c09a40">Auto-optimize delivery</text>
+
+  <!-- Legend -->
+  <rect x="42" y="634" width="12" height="12" rx="2" fill="#1e2e52" stroke="#7c6af7" stroke-width="1"/>
+  <text x="60" y="644" font-size="11" fill="#6a97b8">Frontend</text>
+  <rect x="140" y="634" width="12" height="12" rx="2" fill="#0f2e20" stroke="#34d399" stroke-width="1"/>
+  <text x="158" y="644" font-size="11" fill="#6a97b8">Backend</text>
+  <rect x="232" y="634" width="12" height="12" rx="2" fill="#1f1520" stroke="#fb7185" stroke-width="1"/>
+  <text x="250" y="644" font-size="11" fill="#6a97b8">Database / Realtime</text>
+  <rect x="374" y="634" width="12" height="12" rx="2" fill="#1a1a10" stroke="#fbbf24" stroke-width="1"/>
+  <text x="392" y="644" font-size="11" fill="#6a97b8">External API</text>
+</svg>
