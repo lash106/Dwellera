@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
+  const [appUser, setAppUser] = useState<any>(null);
   const [sellerListings, setSellerListings] = useState<any[]>([]);
   const router = useRouter();
 
@@ -17,6 +18,10 @@ export default function DashboardPage() {
 
       if (user?.user_metadata?.role === "seller") {
         try {
+          const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${user.id}`);
+          if (userRes.ok) {
+            setAppUser(await userRes.json());
+          }
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/listings?seller_id=${user.id}`);
           const data = await res.json();
           setSellerListings(data);
@@ -53,6 +58,8 @@ export default function DashboardPage() {
   };
 
   const isSeller = user?.user_metadata?.role === "seller";
+  const verificationStatus = appUser?.verification_status || "pending";
+  const canCreateListings = verificationStatus === "verified";
 
   return (
     <ProtectedRoute>
@@ -73,7 +80,10 @@ export default function DashboardPage() {
         {isSeller ? (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Your Listings</h2>
+              <div>
+                <h2 className="text-2xl font-bold">Your Listings</h2>
+                <p className="text-sm text-gray-500 mt-1">Verification: <span className="font-semibold capitalize">{verificationStatus.replaceAll('_', ' ')}</span></p>
+              </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => router.push('/messages')}
@@ -83,13 +93,24 @@ export default function DashboardPage() {
                   My Inbox
                 </button>
                 <button
-                  onClick={() => router.push('/create-listing')}
-                  className="px-5 py-2.5 bg-primary text-white font-medium rounded-lg hover:bg-gray-800 shadow transition"
+                  onClick={() => canCreateListings ? router.push('/create-listing') : alert('Seller ID verification must be approved before creating listings.')}
+                  className={`px-5 py-2.5 font-medium rounded-lg shadow transition ${canCreateListings ? 'bg-primary text-white hover:bg-gray-800' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
                 >
                   + Create New Listing
                 </button>
               </div>
             </div>
+
+            {!canCreateListings && (
+              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-900">
+                <h3 className="font-bold">Seller verification required</h3>
+                <p className="text-sm mt-1">
+                  Your account can receive messages, but listing creation is locked until an agent approves your submitted ID.
+                  Pending verifications expire after 48 hours.
+                </p>
+                {appUser?.verification_notes && <p className="text-sm mt-2 font-medium">{appUser.verification_notes}</p>}
+              </div>
+            )}
 
             {sellerListings.length === 0 ? (
               <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-12 text-center text-gray-500">
